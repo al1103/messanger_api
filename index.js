@@ -5,10 +5,8 @@ const { poolPromise } = require("./config/database");
 const routes = require("./routers");
 const cookieParser = require("cookie-parser");
 const http = require("http");
-const socketConfig = require("./config/socket");
-const jwt = require("jsonwebtoken");
 const cors = require("cors");
-const socketIo = require("socket.io");
+const initializeSocket = require("./config/socket");
 
 // Tạo ứng dụng express
 const app = express();
@@ -16,8 +14,18 @@ const app = express();
 // Khởi tạo server HTTP từ express app
 const server = http.createServer(app);
 
-// Khởi tạo Socket.IO
-const io = socketIo(server);
+// Cấu hình CORS
+const corsOptions = {
+  origin: "*", // Thay đổi thành origin của client
+  methods: ["GET", "POST"],
+  credentials: true,
+};
+
+app.use(cors(corsOptions));
+
+// Thay thế phần socket.io cũ bằng:
+const io = initializeSocket(server, corsOptions);
+
 // Cấu hình rate limiter
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 phút
@@ -26,14 +34,11 @@ const limiter = rateLimit({
   legacyHeaders: false,
   message: "Quá nhiều yêu cầu từ IP này, vui lòng thử lại sau 15 phút",
 });
-app.use(cors());
+
 // Sử dụng middleware
 app.use(limiter);
 app.use(bodyParser.json());
 app.use(cookieParser());
-
-// Khởi tạo Socket.IO với cấu hình từ socketConfig
-socketConfig.init(io);
 
 // Khởi tạo kết nối pool
 poolPromise
@@ -52,15 +57,6 @@ routes(app);
 app.use((err, req, res, next) => {
   console.error(err.stack);
   res.status(500).send("Đã xảy ra lỗi!");
-});
-
-// Xử lý kết nối Socket.IO
-io.on("connection", (socket) => {
-  console.log("Một người dùng đã kết nối");
-
-  socket.on("disconnect", () => {
-    console.log("Người dùng đã ngắt kết nối");
-  });
 });
 
 // Bắt đầu lắng nghe cổng từ server HTTP

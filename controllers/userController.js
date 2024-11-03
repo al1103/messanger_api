@@ -109,7 +109,7 @@ exports.login = async (req, res) => {
       refreshTokens.push(refreshToken);
       res
         .status(200)
-        .json({ message: "thành công ", accessToken, refreshToken, user });
+        .json({ message: "thành công ", accessToken, refreshToken,data: user });
     } else {
       res.status(401).json({ error: "Invalid credentials" });
     }
