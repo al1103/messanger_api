@@ -3,10 +3,15 @@ const router = express.Router();
 const messageController = require("../controllers/messageController");
 const authMiddleware = require("../middleware/auth");
 
-router.post("/", authMiddleware, messageController.sendMessage);
+router.use(authMiddleware);
+
+router.post("/send", messageController.sendMessage);
 router.get(
-  "/conversation/:user1Id/:user2Id",
+  "/conversations/:senderId/:receiverId",
   messageController.getConversation
 );
+router.get("/user/:id", messageController.getMessages);
+router.delete("/:messageId", messageController.deleteMessage);
+router.put("/update", messageController.updateMessage);
 
 module.exports = router;

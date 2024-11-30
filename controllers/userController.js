@@ -1,3 +1,4 @@
+require("dotenv").config();
 const bcrypt = require("bcrypt");
 const UserModel = require("../models/user");
 const Message = require("../models/message");
@@ -9,90 +10,119 @@ exports.register = async (req, res) => {
   try {
     const { username, email, password, fullName } = req.body;
 
-    if (!email || !password) {
-      return res.status(400).json({ error: "Email và mật khẩu là bắt buộc" });
+    if (!username || !email || !password || !fullName) {
+      return res.status(400).json({
+        status: 400,
+        error: "Vui lòng điền đầy đủ thông tin",
+      });
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({
+        status: 400,
+        error: "Email không hợp lệ",
+      });
+    }
+
+    // Validate password length
+    if (password.length < 6) {
+      return res.status(400).json({
+        status: 400,
+        error: "Mật khẩu phải có ít nhất 6 ký tự",
+      });
     }
 
     const existingUser = await UserModel.getUserByEmail(email);
-
     if (existingUser) {
-      return res.status(400).json({ error: "Người dùng đã tồn tại" });
+      return res.status(400).json({
+        status: 400,
+        error: "Email đã được sử dụng",
+      });
     }
 
-    // Hash mật khẩu
+    // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    try {
-      const code = await sendRandomCodeEmail("tuanpa@hblab.vn");
-      await UserModel.sendCode(email, code);
-    } catch (error) {
-      console.error("Lỗi khi gửi email:", error);
-      return res.status(500).json({ error: "Lỗi khi gửi mã xác nhận" });
-    }
+    // Generate 6-digit verification code
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
 
-    // Lưu thông tin tạm thời vào cookie
-    res.cookie(
-      "tempUser",
-      JSON.stringify({
-        username,
-        email,
-        password: hashedPassword,
-        fullName,
-      }),
-      { maxAge: 600000, httpOnly: true }
-    ); // Cookie hết hạn sau 10 phút
+    // Send verification code via email
+    await sendRandomCodeEmail(email, code);
+    console.log("Generated code:", code);
 
-    return res
-      .status(200)
-      .json({ message: "Vui lòng kiểm tra email để lấy mã xác nhận" });
+    // Save verification code to database
+    await UserModel.sendCode(email, code);
+
+    // Define userData
+    const userData = { username, email, password: hashedPassword, fullName };
+
+    // Create JWT token with user data (set expiration time for the token)
+    const token = jwt.sign(userData, process.env.JWT_SECRET_KEY, {
+      expiresIn: "1m",
+    });
+
+    return res.status(200).json({
+      status: 200,
+      message: "Vui lòng kiểm tra email để lấy mã xác nhận",
+      token, // Send the token to the client
+    });
   } catch (error) {
-    console.error(error);
-    return res.status(500).json({ error: "Đã xảy ra lỗi" });
+    console.error("Registration error:", error);
+    return res.status(500).json({
+      status: 500,
+      error: "Đã xảy ra lỗi trong quá trình đăng ký",
+    });
   }
 };
 
 exports.verifyRegistration = async (req, res) => {
   try {
-    const { code } = req.body;
+    const { token, code } = req.body;
+
+    if (!token) {
+      return res.status(400).json({ error: "Token không tồn tại" });
+    }
 
     if (!code) {
       return res.status(400).json({ error: "Mã xác nhận là bắt buộc" });
     }
 
-    const tempUser = req.cookies.tempUser
-      ? JSON.parse(req.cookies.tempUser)
-      : null;
+    // Decode the token and retrieve user data
+    let tempUser;
+    try {
+      tempUser = jwt.verify(token, process.env.JWT_SECRET_KEY);
+    } catch (error) {
+      return res
+        .status(400)
+        .json({ error: "Token không hợp lệ hoặc đã hết hạn" });
+    }
 
-    console.log("Người dùng tạm thời từ cookie:", tempUser);
-
+    console.log(tempUser);
+    console.log(tempUser.email, code);
+    // Verify the code
     const isCodeValid = await UserModel.verifyCode(tempUser.email, code);
-
-    if (!tempUser || !isCodeValid) {
+    if (!isCodeValid) {
       return res
         .status(400)
         .json({ error: "Mã xác nhận không hợp lệ hoặc đã hết hạn" });
     }
 
-    try {
-      const result = await UserModel.register(
-        tempUser.username,
-        tempUser.email,
-        tempUser.password,
-        tempUser.fullName
-      );
-      console.log(result);
-      res.clearCookie("tempUser");
-      return res
-        .status(201)
-        .json({ message: "Đăng ký thành công", userId: result.userId });
-    } catch (registerError) {
-      if (registerError.message === "Email hoặc tên người dùng đã tồn tại") {
-        return res.status(400).json({ error: registerError.message });
-      }
-      throw registerError;
-    }
+    const result = await UserModel.register(
+      tempUser.username,
+      tempUser.email,
+      tempUser.password,
+      tempUser.fullName
+    );
+
+    return res.status(201).json({
+      status: 201,
+      message: "Đăng ký thành công",
+      userId: result.userId,
+    });
   } catch (error) {
-    console.error("Lỗi trong quá trình đăng ký:", error);
+    console.error("Error during verification:", error);
     return res
       .status(500)
       .json({ error: "Đã xảy ra lỗi. Vui lòng thử lại sau." });
@@ -107,9 +137,12 @@ exports.login = async (req, res) => {
       const accessToken = generateAccessToken(user);
       const refreshToken = jwt.sign(user, process.env.REFRESH_SECRET_KEY);
       refreshTokens.push(refreshToken);
-      res
-        .status(200)
-        .json({ message: "thành công ", accessToken, refreshToken,data: user });
+      res.status(200).json({
+        message: "thành công ",
+        accessToken,
+        refreshToken,
+        data: user,
+      });
     } else {
       res.status(401).json({ error: "Invalid credentials" });
     }

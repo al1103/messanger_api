@@ -6,18 +6,17 @@ class Comment {
       const pool = await poolPromise;
       const result = await pool
         .request()
-        .input('postId', sql.Int, postId)
-        .input('authorId', sql.Int, authorId)
-        .input('content', sql.NVarChar, content)
-        .input('parentCommentId', sql.Int, parentCommentId)
-        .query(`
+        .input("postId", sql.Int, postId)
+        .input("authorId", sql.Int, authorId)
+        .input("content", sql.NVarChar, content)
+        .input("parentCommentId", sql.Int, parentCommentId).query(`
           INSERT INTO Comments (PostID, AuthorID, Content, ParentCommentID)
           VALUES (@postId, @authorId, @content, @parentCommentId);
           SELECT SCOPE_IDENTITY() AS CommentID;
         `);
       return result.recordset[0].CommentID;
     } catch (error) {
-      console.error('Lỗi khi tạo bình luận:', error);
+      console.error("Lỗi khi tạo bình luận:", error);
       throw error;
     }
   }
@@ -25,9 +24,7 @@ class Comment {
   static async getByPostId(postId) {
     try {
       const pool = await poolPromise;
-      const result = await pool
-        .request()
-        .input('postId', sql.Int, postId)
+      const result = await pool.request().input("postId", sql.Int, postId)
         .query(`
           WITH CommentCTE AS (
             SELECT c.*, u.Username, 0 AS Level
@@ -53,7 +50,7 @@ class Comment {
         `);
       return result.recordset;
     } catch (error) {
-      console.error('Lỗi khi lấy bình luận:', error);
+      console.error("Lỗi khi lấy bình luận:", error);
       throw error;
     }
   }
@@ -83,9 +80,8 @@ class Comment {
       const pool = await poolPromise;
       const result = await pool
         .request()
-        .input('commentId', sql.Int, commentId)
-        .input('authorId', sql.Int, authorId)
-        .query(`
+        .input("commentId", sql.Int, commentId)
+        .input("authorId", sql.Int, authorId).query(`
           UPDATE Comments
           SET IsDeleted = 1
           WHERE CommentID = @commentId AND AuthorID = @authorId;
@@ -93,7 +89,7 @@ class Comment {
         `);
       return result.recordset[0].AffectedRows > 0;
     } catch (error) {
-      console.error('Lỗi khi xóa mềm bình luận:', error);
+      console.error("Lỗi khi xóa mềm bình luận:", error);
       throw error;
     }
   }
@@ -103,32 +99,31 @@ class Comment {
       const pool = await poolPromise;
       const result = await pool
         .request()
-        .input('commentId', sql.Int, commentId)
-        .input('authorId', sql.Int, authorId)
-        .query(`
+        .input("commentId", sql.Int, commentId)
+        .input("authorId", sql.Int, authorId).query(`
           WITH CommentTree AS (
             SELECT CommentID
             FROM Comments
-            WHERE CommentID = @commentId AND AuthorID = @authorId AND IsDeleted = 0
+            WHERE CommentID = @commentId AND AuthorID = @authorId 
             
             UNION ALL
             
             SELECT c.CommentID
             FROM Comments c
             INNER JOIN CommentTree ct ON c.ParentCommentID = ct.CommentID
-            WHERE c.IsDeleted = 0
+           
           )
           UPDATE c
           SET IsDeleted = 1, UpdatedAt = GETDATE()
           FROM Comments c
           INNER JOIN CommentTree ct ON c.CommentID = ct.CommentID
-          WHERE c.IsDeleted = 0;
+          
 
           SELECT @@ROWCOUNT AS AffectedRows;
         `);
       return result.recordset[0].AffectedRows > 0;
     } catch (error) {
-      console.error('Lỗi khi xóa mềm bình luận và các bình luận con:', error);
+      console.error("Lỗi khi xóa mềm bình luận và các bình luận con:", error);
       throw error;
     }
   }
@@ -159,8 +154,8 @@ class Comment {
       await transaction.begin();
 
       const request = new sql.Request(transaction);
-      request.input('commentId', sql.Int, commentId);
-      request.input('authorId', sql.Int, authorId);
+      request.input("commentId", sql.Int, commentId);
+      request.input("authorId", sql.Int, authorId);
 
       // Lấy tất cả các comment con
       const childComments = await request.query(`
@@ -189,7 +184,7 @@ class Comment {
       return true;
     } catch (error) {
       await transaction.rollback();
-      console.error('Lỗi khi xóa bình luận và các bình luận con:', error);
+      console.error("Lỗi khi xóa bình luận và các bình luận con:", error);
       throw error;
     }
   }

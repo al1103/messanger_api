@@ -5,7 +5,7 @@ const commentRoutes = require("./commentRoutes");
 const likeRoutes = require("./like");
 const aiRoutes = require("./aiRoutes");
 function routes(app) {
-  app.use("/api", usersRouter);
+  app.use("/api/auth", usersRouter);
   app.use("/api/messages", messageRoutes);
   app.use("/api/posts", postRoutes);
   app.use("/api/comments", commentRoutes);

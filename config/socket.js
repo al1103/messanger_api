@@ -1,65 +1,80 @@
+// config/socket.js
 const socketIO = require("socket.io");
 
-// Lưu trữ mapping giữa userId và socketId
-const userSocketMap = new Map();
-
 function initializeSocket(server, corsOptions) {
+  const defaultCorsOptions = {
+    origin: "*",
+    methods: ["GET", "POST", "PUT", "DELETE"],
+    credentials: true,
+    allowedHeaders: ["Content-Type", "Authorization"],
+  };
+
   const io = socketIO(server, {
-    cors: corsOptions,
+    cors: corsOptions || defaultCorsOptions,
+    pingTimeout: 60000,
+    pingInterval: 25000,
+    reconnection: true,
+    reconnectionAttempts: 5,
+    reconnectionDelay: 1000,
   });
 
+  // Setup socket event handlers
   io.on("connection", (socket) => {
-    console.log("Người dùng đã kết nối:", socket.id);
+    console.log(`New socket connection: ${socket.id}`);
 
-    // Đăng ký người dùng với socket
+    // Register user
     socket.on("register", (userId) => {
-      console.log("Đăng ký người dùng:", userId, "với socket:", socket.id);
-      userSocketMap.set(userId, socket.id);
-      socket.userId = userId;
+      if (userId) {
+        socket.userId = userId;
+        socket.join(userId);
+        console.log(`User registered: ${userId}`);
+      }
     });
 
-    // Xử lý tin nhắn riêng tư
+    // Handle private messages
     socket.on("private_message", (data) => {
-      const { receiverId, message } = data;
-      const senderId = socket.userId;
+      try {
+        const { receiverId, message } = data;
+        console.log(`Sending message to ${receiverId}:`, message);
 
-      if (!senderId) {
-        socket.emit("error", { message: "Bạn chưa đăng ký người dùng" });
-        return;
-      }
-
-      // Tìm socket của người nhận
-      const receiverSocketId = userSocketMap.get(receiverId);
-
-      if (receiverSocketId) {
-        // Gửi tin nhắn cho người nhận
-        console.log("Gửi tin nhắn cho người nhận:", receiverSocketId);
-        io.to(receiverSocketId).emit("private_message", {
-          senderId,
-          message,
-          timestamp: new Date(),
+        // Emit to specific receiver
+        io.to(receiverId).emit("newMessage", {
+          messageId: data.messageId,
+          senderId: socket.userId,
+          content: message,
+          createdAt: new Date(),
         });
 
-        // Gửi xác nhận lại cho người gửi
+        // Acknowledge message sent
         socket.emit("message_sent", {
-          receiverId,
-          message,
-          timestamp: new Date(),
+          messageId: data.messageId,
+          status: "sent",
         });
-      } else {
-        // Thông báo nếu người nhận không online
-        socket.emit("error", {
-          message: "Người dùng không trực tuyến hoặc không tồn tại",
+      } catch (error) {
+        console.error("Error sending message:", error);
+        socket.emit("message_error", {
+          messageId: data.messageId,
+          error: "Failed to send message",
         });
       }
     });
 
-    // Xử lý ngắt kết nối
+    // Handle typing status
+    socket.on("typing", (data) => {
+      const { receiverId, isTyping } = data;
+      io.to(receiverId).emit("user_typing", {
+        userId: socket.userId,
+        isTyping,
+      });
+    });
+
     socket.on("disconnect", () => {
-      if (socket.userId) {
-        userSocketMap.delete(socket.userId);
-        console.log("Người dùng đã ngắt kết nối:", socket.userId);
-      }
+      console.log(`Socket disconnected: ${socket.id}`);
+    });
+
+    // Handle errors
+    socket.on("error", (error) => {
+      console.error("Socket error:", error);
     });
   });
 

@@ -42,11 +42,8 @@ async function generateSuggestions(senderId, receiverId) {
   }
 }
 
-async function sendRandomCodeEmail(email) {
+async function sendRandomCodeEmail(email, code) {
   try {
-    // Tạo mã xác nhận ngẫu nhiên
-    const code = Math.floor(100000 + Math.random() * 900000).toString();
-
     // Cấu hình transporter
     const transporter = nodemailer.createTransport({
       secureConnection: false, // TLS requires secureConnection to be false

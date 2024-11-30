@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Zilong Glitch Effect</title>
+    <style>
+      body {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+        background-color: #1a1a1d;
+        font-size: 5em;
+        font-family: "Courier New", monospace;
+        color: #fff;
+        overflow: hidden;
+      }
+      #displayText {
+        display: flex;
+        gap: 0.15em;
+      }
+      .letter {
+        opacity: 0;
+        transition: transform 0.2s ease, opacity 0.2s ease;
+        color: #ffffff;
+        animation: glitch 0.2s infinite; /* Hiệu ứng glitch khi random */
+      }
+      .letter.active {
+        opacity: 1;
+        color: #ffffff;
+        transform: scale(1.1);
+        text-shadow: 2px 2px #ff0066, -2px -2px #00ccff; /* Hiệu ứng màu lệch RGB */
+        animation: shake 0.1s infinite; /* Hiệu ứng rung nhẹ */
+      }
+
+      /* Hiệu ứng glitch khi random */
+      @keyframes glitch {
+        0%,
+        100% {
+          text-shadow: 2px 0 #ff0066, -2px 0 #00ccff;
+          opacity: 0.8;
+        }
+        50% {
+          text-shadow: -2px 0 #ff0066, 2px 0 #00ccff;
+          opacity: 1;
+        }
+      }
+
+      /* Hiệu ứng rung nhẹ khi dừng */
+      @keyframes shake {
+        0% {
+          transform: translate(0, 0);
+        }
+        25% {
+          transform: translate(-1px, 1px);
+        }
+        50% {
+          transform: translate(1px, -1px);
+        }
+        75% {
+          transform: translate(-1px, -1px);
+        }
+        100% {
+          transform: translate(1px, 1px);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="displayText"></div>
+
+    <script>
+      const targetText = "ZILONG";
+      const displayElement = document.getElementById("displayText");
+      let currentIndex = 0;
+
+      // Tạo một <span> cho mỗi chữ cái
+      targetText.split("").forEach(() => {
+        const span = document.createElement("span");
+        span.classList.add("letter");
+        span.textContent = " ";
+        displayElement.appendChild(span);
+      });
+
+      function randomChar() {
+        const characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+        return characters[Math.floor(Math.random() * characters.length)];
+      }
+
+      function revealNextChar() {
+        const letters = document.querySelectorAll(".letter");
+        let randomCount = 0;
+
+        const intervalId = setInterval(() => {
+          letters[currentIndex].textContent = randomChar();
+          letters[currentIndex].style.opacity = 1; // Hiển thị chữ random
+          randomCount++;
+
+          if (randomCount > 20) {
+            // Random 10 lần trước khi dừng
+            clearInterval(intervalId);
+            letters[currentIndex].textContent = targetText[currentIndex];
+            letters[currentIndex].classList.add("active"); // Kích hoạt hiệu ứng khi đúng chữ cái
+
+            currentIndex++;
+            if (currentIndex < targetText.length) {
+              setTimeout(revealNextChar, 300); // Chuyển sang ký tự tiếp theo
+            }
+          }
+        }, 50); // Tốc độ random
+      }
+
+      revealNextChar();
+    </script>
+  </body>
+</html>

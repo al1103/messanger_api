@@ -16,9 +16,10 @@ const server = http.createServer(app);
 
 // Cấu hình CORS
 const corsOptions = {
-  origin: "*", // Thay đổi thành origin của client
-  methods: ["GET", "POST"],
+  origin: true, // Hoặc địa chỉ cụ thể của client
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   credentials: true,
+  allowedHeaders: ["Content-Type", "Authorization", "Set-Cookie"],
 };
 
 app.use(cors(corsOptions));

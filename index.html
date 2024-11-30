@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Trang Chat</title>
+    <style>
+      .chat-container {
+        max-width: 600px;
+        margin: 20px auto;
+        padding: 20px;
+        border: 1px solid #ccc;
+      }
+      .message-container {
+        height: 300px;
+        overflow-y: auto;
+        border: 1px solid #eee;
+        padding: 10px;
+        margin-bottom: 20px;
+      }
+      .message {
+        margin: 5px 0;
+        padding: 5px;
+        border-radius: 5px;
+      }
+      .sent {
+        background-color: #e3f2fd;
+        margin-left: 20%;
+      }
+      .received {
+        background-color: #f5f5f5;
+        margin-right: 20%;
+      }
+      .input-container {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 10px;
+      }
+      input {
+        padding: 5px;
+      }
+      .status {
+        color: #666;
+        font-size: 14px;
+        margin-bottom: 10px;
+      }
+      .timestamp {
+        font-size: 12px;
+        color: #888;
+        margin-top: 2px;
+      }
+      .message {
+        padding: 8px;
+        margin: 8px 0;
+      }
+      button {
+        padding: 8px 15px;
+        cursor: pointer;
+        background: #4CAF50;
+        color: white;
+        border: none;
+        border-radius: 4px;
+      }
+      button:hover {
+        background: #45a049;
+      }
+      input {
+        flex: 1;
+        padding: 8px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="chat-container">
+      <div class="status" id="connectionStatus">Trạng thái: Đang kết nối...</div>
+      <div class="input-container">
+        <input type="text" id="userId" placeholder="Nhập ID của bạn" />
+        <button onclick="register()" id="registerBtn">Đăng ký</button>
+      </div>
+      <div class="input-container">
+        <input type="text" id="receiverId" placeholder="ID người nhận" />
+      </div>
+      <div class="message-container" id="messages"></div>
+      <div class="input-container">
+        <input type="text" id="messageInput" placeholder="Nhập tin nhắn..." disabled />
+        <button onclick="sendMessage()" id="sendBtn" disabled>Gửi</button>
+      </div>
+    </div>
+
+    <script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
+    <script>
+      const socket = io('http://localhost:3000', {
+        withCredentials: true,
+        transports: ['websocket']
+      });
+      let myUserId = null;
+      const statusDiv = document.getElementById('connectionStatus');
+      const messageInput = document.getElementById('messageInput');
+      const sendBtn = document.getElementById('sendBtn');
+
+      socket.on('connect', () => {
+        statusDiv.textContent = 'Trạng thái: Đã kết nối';
+        statusDiv.style.color = '#4CAF50';
+      });
+
+      socket.on('disconnect', () => {
+        statusDiv.textContent = 'Trạng thái: Mất kết nối';
+        statusDiv.style.color = '#f44336';
+      });
+
+      function register() {
+        const userId = document.getElementById("userId").value.trim();
+        if (userId) {
+          myUserId = userId;
+          socket.emit("register", userId);
+          
+          messageInput.disabled = false;
+          sendBtn.disabled = false;
+          document.getElementById('userId').disabled = true;
+          document.getElementById('registerBtn').disabled = true;
+          
+          statusDiv.textContent = `Trạng thái: Đã đăng ký với ID: ${userId}`;
+        } else {
+          alert("Vui lòng nhập ID hợp lệ");
+        }
+      }
+
+      function sendMessage() {
+        if (!myUserId) {
+          alert("Vui lòng đăng ký trước khi gửi tin nhắn");
+          return;
+        }
+
+        const receiverId = document.getElementById("receiverId").value.trim();
+        const message = messageInput.value.trim();
+
+        if (receiverId && message) {
+          socket.emit("private_message", {
+            receiverId: receiverId,
+            message: message,
+          });
+          messageInput.value = "";
+        } else {
+          alert("Vui lòng nhập ID người nhận và nội dung tin nhắn");
+        }
+      }
+
+      function formatTimestamp(timestamp) {
+        return new Date(timestamp).toLocaleTimeString();
+      }
+
+      function addMessage(message, type, timestamp) {
+        const messagesDiv = document.getElementById("messages");
+        const messageElement = document.createElement("div");
+        messageElement.classList.add("message", type);
+        
+        const messageContent = document.createElement("div");
+        messageContent.textContent = message;
+        
+        const timeDiv = document.createElement("div");
+        timeDiv.classList.add("timestamp");
+        timeDiv.textContent = formatTimestamp(timestamp);
+        
+        messageElement.appendChild(messageContent);
+        messageElement.appendChild(timeDiv);
+        messagesDiv.appendChild(messageElement);
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+      }
+
+      socket.on("private_message", (data) => {
+        const message = `${data.senderId}: ${data.message}`;
+        addMessage(message, "received", data.timestamp);
+      });
+
+      socket.on("message_sent", (data) => {
+        const message = `Bạn (tới ${data.receiverId}): ${data.message}`;
+        addMessage(message, "sent", data.timestamp);
+      });
+
+      socket.on("error", (data) => {
+        alert(data.message);
+      });
+
+      messageInput.addEventListener("keypress", (e) => {
+        if (e.key === "Enter") {
+          sendMessage();
+        }
+      });
+    </script>
+  </body>
+</html>
+
